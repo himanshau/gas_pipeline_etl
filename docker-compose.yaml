@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for ETL data storage
+  postgres_etl:
+    image: postgres:13
+    container_name: postgres_etl
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fuel_prices
+    ports:
+      - "5433:5432" # Use 5433 to avoid conflict with Astro's postgres
+    volumes:
+      - postgres_etl_data:/var/lib/postgresql/data
+      - ./include/sql:/docker-entrypoint-initdb.d # Auto-run schema.sql on startup
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d fuel_prices" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_network
+
+networks:
+  etl_network:
+    driver: bridge
+
+volumes:
+  postgres_etl_data:

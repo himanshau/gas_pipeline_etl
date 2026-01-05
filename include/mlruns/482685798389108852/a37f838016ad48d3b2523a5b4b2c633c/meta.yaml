@@ -1,0 +1,14 @@
+artifact_uri: file:////usr/local/airflow/include/utils/../mlruns/482685798389108852/a37f838016ad48d3b2523a5b4b2c633c/artifacts
+end_time: 1767624379888
+entry_point_name: ''
+experiment_id: '482685798389108852'
+lifecycle_stage: active
+run_id: a37f838016ad48d3b2523a5b4b2c633c
+run_name: fuel_etl_manual__2026-01-05T14:40:45+00:00
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1767624377438
+status: 3
+tags: []
+user_id: astro
