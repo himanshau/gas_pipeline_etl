@@ -1,45 +1,126 @@
-Overview
-========
+# 🛢️ Fuel Price ETL Pipeline
 
-Welcome to Astronomer! This project was generated after you ran 'astro dev init' using the Astronomer CLI. This readme describes the contents of the project, as well as how to run Apache Airflow on your local machine.
+A production-ready ETL pipeline that fetches daily fuel prices across India and stores them in PostgreSQL using the **Bronze-Silver-Gold** medallion architecture.
+---
 
-Project Contents
-================
+## 📌 Project Overview
 
-Your Astro project contains the following files and folders:
+This pipeline **extracts real-time fuel prices** (Petrol, Diesel, LPG, CNG) for 700+ cities in India from RapidAPI, transforms the data through Bronze → Silver → Gold layers, and stores it in PostgreSQL for analytics and ML forecasting.
 
-- dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes one example DAG:
-    - `example_astronauts`: This DAG shows a simple ETL pipeline example that queries the list of astronauts currently in space from the Open Notify API and prints a statement for each astronaut. The DAG uses the TaskFlow API to define tasks in Python, and dynamic task mapping to dynamically print a statement for each astronaut. For more on how this DAG works, see our [Getting started tutorial](https://www.astronomer.io/docs/learn/get-started-with-airflow).
-- Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here.
-- include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
-- packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
-- requirements.txt: Install Python packages needed for your project by adding them to this file. It is empty by default.
-- plugins: Add custom or community plugins for your project to this file. It is empty by default.
-- airflow_settings.yaml: Use this local-only file to specify Airflow Connections, Variables, and Pools instead of entering them in the Airflow UI as you develop DAGs in this project.
+### Data Source
+- **API**: [Daily Fuel Prices India - RapidAPI](https://rapidapi.com/search/fuel%20prices%20india)
+- **Update Frequency**: Daily at 6:00 AM IST
+- **Coverage**: 700+ cities across all Indian states
+- **Fuel Types**: Petrol, Diesel, LPG, CNG
 
-Deploy Your Project Locally
-===========================
+---
 
-Start Airflow on your local machine by running 'astro dev start'.
+## 🏗️ Architecture
 
-This command will spin up five Docker containers on your machine, each for a different Airflow component:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     ETL PIPELINE FLOW                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   RapidAPI  →  BRONZE (Raw)  →  SILVER (Clean)  →  GOLD (Agg)   │
+│                                                                  │
+│   Nested        JSONB           Normalized         State-level  │
+│   JSON          Storage         Rows               Analytics    │
+│                                                                  │
+│   1 API call    1 row           4 rows             Aggregates   │
+│   per city      per city/day    per city/day       per state    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-- Postgres: Airflow's Metadata Database
-- Scheduler: The Airflow component responsible for monitoring and triggering tasks
-- DAG Processor: The Airflow component responsible for parsing DAGs
-- API Server: The Airflow component responsible for serving the Airflow UI and API
-- Triggerer: The Airflow component responsible for triggering deferred tasks
+### Data Layers
 
-When all five containers are ready the command will open the browser to the Airflow UI at http://localhost:8080/. You should also be able to access your Postgres Database at 'localhost:5432/postgres' with username 'postgres' and password 'postgres'.
+| Layer | Table | Records | Description |
+|-------|-------|---------|-------------|
+| **Bronze** | `bronze_fuel_prices` | 150 | Raw API response stored as JSONB |
+| **Silver** | `silver_fuel_prices` | 600 | Flattened - one row per fuel type |
+| **Gold** | `gold_state_analytics` | 600 | State-level MIN, MAX, AVG prices |
 
-Note: If you already have either of the above ports allocated, you can either [stop your existing Docker containers or change the port](https://www.astronomer.io/docs/astro/cli/troubleshoot-locally#ports-are-not-available-for-my-local-airflow-webserver).
+---
 
-Deploy Your Project to Astronomer
-=================================
+## 🚀 Quick Start
 
-If you have an Astronomer account, pushing code to a Deployment on Astronomer is simple. For deploying instructions, refer to Astronomer documentation: https://www.astronomer.io/docs/astro/deploy-code/
+### Prerequisites
+- Docker Desktop
+- Python 3.10+
+- Astronomer CLI (`winget install Astronomer.Astro`)
 
-Contact
-=======
+## Project Structure
 
-The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support.
+```
+gas_pipeline_etl/
+├── dags/
+│   └── fuel_pipeline.py          # Main ETL DAG (Bronze→Silver→Gold)
+├── include/
+│   ├── sql/
+│   │   └── schema.sql            # PostgreSQL schema
+│   └── utils/
+│       ├── api_client.py         # RapidAPI client
+│       ├── db_utils.py           # Database operations
+│       └── mlflow_utils.py       # MLflow tracking
+├── notebooks/
+│   └── etl_data_showcase.ipynb   # Data exploration notebook
+├── docker-compose.yaml           # PostgreSQL container
+├── requirements.txt              # Python dependencies
+└── Dockerfile                    # Astro Airflow image
+```
+
+---
+
+## 📊 Sample Data
+
+### Bronze Layer (Raw JSONB)
+```sql
+SELECT city_id, applicable_on, raw_data->'fuel'->'petrol'->>'retailPrice' 
+FROM bronze_fuel_prices LIMIT 3;
+```
+| city_id | applicable_on | petrol_price |
+|---------|---------------|--------------|
+| mumbai | 2025-08-13 | 103.49 |
+| delhi | 2025-08-13 | 94.27 |
+| bengaluru | 2025-08-13 | 102.90 |
+
+### Silver Layer (Normalized)
+| city_id | fuel_type | retail_price | price_change |
+|---------|-----------|--------------|--------------|
+| mumbai | petrol | 103.49 | 0.00 |
+| mumbai | diesel | 89.88 | 0.00 |
+| mumbai | lpg | 772.50 | 0.00 |
+| mumbai | cng | 75.00 | 0.00 |
+
+### Gold Layer (Analytics)
+| state_name | fuel_type | avg_price | min_price | max_price |
+|------------|-----------|-----------|-----------|-----------|
+| Delhi | petrol | 94.27 | 94.27 | 94.27 |
+| Maharashtra | petrol | 103.49 | 103.49 | 103.49 |
+| Karnataka | petrol | 102.90 | 102.90 | 102.90 |
+
+---
+
+## 🛠️ Technologies
+
+- **Apache Airflow** (Astronomer) - Workflow orchestration
+- **PostgreSQL 13** - Data warehouse with JSONB support
+- **Python 3.10** - ETL logic
+- **Docker** - Containerization
+- **MLflow** - Experiment tracking (local)
+
+---
+
+## 📈 Future Enhancements
+
+- [ ] Add more cities (currently tracking 5 major metros)
+- [ ] ML model for price forecasting
+- [ ] Grafana dashboard for visualization
+- [ ] Deploy to Astronomer Cloud
+
+---
+
+## 📄 License
+
+MIT License

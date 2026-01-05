@@ -32,16 +32,7 @@ class FuelPriceAPI:
         return response.json()
     
     def get_city_history(self, state_id: str, city_id: str) -> Dict[str, Any]:
-        """
-        Get 30-day price history for a city
-        
-        Args:
-            state_id: State identifier (e.g., 'maharashtra')
-            city_id: City identifier (e.g., 'mumbai')
-        
-        Returns:
-            API response with history data
-        """
+        """API response with history data"""
         endpoint = f"history/india/{state_id}/{city_id}"
         return self._request(endpoint)
     
@@ -73,16 +64,7 @@ DEFAULT_CITIES = [
 
 
 def get_fuel_data_for_cities(api_key: str, cities: Optional[List[Dict]] = None) -> List[Dict]:
-    """
-    Fetch fuel data for multiple cities
-    
-    Args:
-        api_key: RapidAPI key
-        cities: List of dicts with state_id and city_id
-    
-    Returns:
-        List of API responses
-    """
+    """List of API responses"""
     client = FuelPriceAPI(api_key=api_key)
     cities = cities or DEFAULT_CITIES
     

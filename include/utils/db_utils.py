@@ -38,15 +38,7 @@ def get_connection():
 # =====================
 
 def insert_bronze_data(data_list: List[Dict[str, Any]]) -> int:
-    """
-    Insert raw API data into bronze layer
-    
-    Args:
-        data_list: List of API responses
-    
-    Returns:
-        Number of records inserted
-    """
+    """Number of records inserted"""
     query = """
         INSERT INTO bronze_fuel_prices 
         (city_id, city_name, state_id, state_name, applicable_on, raw_data)
@@ -85,12 +77,7 @@ def insert_bronze_data(data_list: List[Dict[str, Any]]) -> int:
 # =====================
 
 def transform_bronze_to_silver() -> int:
-    """
-    Transform bronze data to silver layer (flatten and normalize)
-    
-    Returns:
-        Number of records processed
-    """
+    """Number of records processed"""
     query = """
         INSERT INTO silver_fuel_prices 
         (city_id, city_name, state_id, state_name, applicable_on, 
@@ -121,18 +108,8 @@ def transform_bronze_to_silver() -> int:
             cur.execute(query)
             return cur.rowcount
 
-
-# =====================
-# GOLD LAYER OPERATIONS
-# =====================
-
 def aggregate_to_gold_state_analytics() -> int:
-    """
-    Aggregate silver data to state-level analytics
-    
-    Returns:
-        Number of records created
-    """
+    """Number of records created"""
     query = """
         INSERT INTO gold_state_analytics
         (state_id, state_name, report_date, fuel_type, 
@@ -166,12 +143,7 @@ def aggregate_to_gold_state_analytics() -> int:
 
 
 def compute_price_trends() -> int:
-    """
-    Compute 30-day price trends for ML/forecasting
-    
-    Returns:
-        Number of trend records created
-    """
+    """Number of trend records created"""
     query = """
         INSERT INTO gold_price_trends
         (city_id, city_name, state_id, fuel_type, 
@@ -207,10 +179,6 @@ def compute_price_trends() -> int:
             cur.execute(query)
             return cur.rowcount
 
-
-# =====================
-# LOGGING & METRICS
-# =====================
 
 def log_etl_run(run_id: str, dag_id: str, task_id: str, layer: str,
                 records_processed: int, records_failed: int = 0,
