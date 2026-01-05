@@ -103,6 +103,4 @@ jupyter notebook models/fuel_price_prediction.ipynb
 
 ---
 
-## 📄 License
 
-MIT License
