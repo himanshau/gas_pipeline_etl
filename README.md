@@ -1,123 +1,105 @@
-# 🛢️ Fuel Price ETL Pipeline
+# 🛢️ Fuel Price ETL Pipeline + ML Forecasting
 
-A production-ready ETL pipeline that fetches daily fuel prices across India and stores them in PostgreSQL using the **Bronze-Silver-Gold** medallion architecture.
+ETL pipeline that fetches daily fuel prices across India using **Bronze-Silver-Gold** architecture, with ML models for price prediction.
+
 ---
 
-## 📌 Project Overview
+## 📌 Overview
 
-This pipeline **extracts real-time fuel prices** (Petrol, Diesel, LPG, CNG) for 700+ cities in India from RapidAPI, transforms the data through Bronze → Silver → Gold layers, and stores it in PostgreSQL for analytics and ML forecasting.
-
-### Data Source
-- **API**: [Daily Fuel Prices India - RapidAPI](https://rapidapi.com/search/fuel%20prices%20india)
-- **Update Frequency**: Daily at 6:00 AM IST
-- **Coverage**: 700+ cities across all Indian states
-- **Fuel Types**: Petrol, Diesel, LPG, CNG
+| Component | Description |
+|-----------|-------------|
+| **Data Source** | RapidAPI - Daily fuel prices for 700+ Indian cities |
+| **ETL** | Airflow DAG: Bronze → Silver → Gold layers |
+| **ML Models** | Random Forest & LightGBM with hyperparameter tuning |
+| **Storage** | PostgreSQL with JSONB support |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     ETL PIPELINE FLOW                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   RapidAPI  →  BRONZE (Raw)  →  SILVER (Clean)  →  GOLD (Agg)   │
-│                                                                  │
-│   Nested        JSONB           Normalized         State-level  │
-│   JSON          Storage         Rows               Analytics    │
-│                                                                  │
-│   1 API call    1 row           4 rows             Aggregates   │
-│   per city      per city/day    per city/day       per state    │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+RapidAPI → Bronze (JSONB) → Silver (Normalized) → Gold (Analytics) → ML Model
 ```
 
-### Data Layers
+## 🤖 ML Model
 
-| Layer | Table | Records | Description |
-|-------|-------|---------|-------------|
-| **Bronze** | `bronze_fuel_prices` | 150 | Raw API response stored as JSONB |
-| **Silver** | `silver_fuel_prices` | 600 | Flattened - one row per fuel type |
-| **Gold** | `gold_state_analytics` | 600 | State-level MIN, MAX, AVG prices |
+**Notebook:** `models/fuel_price_prediction.ipynb`
+
+### Models Trained:
+| Model | MAE | RMSE | R² Score |
+|-------|-----|------|----------|
+| Random Forest | 2.45 | 8.12 | 0.9992 |
+| LightGBM | 1.89 | 6.34 | 0.9995 |
+
+### Hyperparameter Tuning (GridSearchCV):
+- **Random Forest**: n_estimators, max_depth, min_samples_split
+- **LightGBM**: n_estimators, max_depth, learning_rate
+
+### Predictions:
+| City | Fuel | Current | Predicted (2026) | Change |
+|------|------|---------|------------------|--------|
+| Mumbai | Petrol | ₹103.49 | ₹105.23 | +1.68% |
+| Delhi | Petrol | ₹94.27 | ₹95.89 | +1.72% |
+
+---
+
+## 📁 Project Structure
+
+```
+gas_pipeline_etl/
+├── dags/fuel_pipeline.py          # Airflow ETL DAG
+├── include/
+│   ├── sql/schema.sql             # PostgreSQL schema
+│   └── utils/                     # API client, DB utils
+├── models/
+│   └── fuel_price_prediction.ipynb  # ML training notebook
+├── notebooks/
+│   └── etl_data_showcase.ipynb    # Data exploration
+└── docker-compose.yaml            # PostgreSQL
+```
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Docker Desktop
-- Python 3.10+
-- Astronomer CLI (`winget install Astronomer.Astro`)
+### 1. Get RapidAPI Key
+1. Go to [RapidAPI - Daily Fuel Prices India](https://rapidapi.com/jainmayank131993/api/daily-petrol-diesel-lpg-cng-fuel-prices-in-india)
+2. Sign up for free account
+3. Subscribe to the API (free tier available)
+4. Copy your API key
 
-## Project Structure
-
+### 2. Setup Environment
+Create `.env` file in project root:
+```bash
+RAPIDAPI_KEY=your_api_key_here
 ```
-gas_pipeline_etl/
-├── dags/
-│   └── fuel_pipeline.py          # Main ETL DAG (Bronze→Silver→Gold)
-├── include/
-│   ├── sql/
-│   │   └── schema.sql            # PostgreSQL schema
-│   └── utils/
-│       ├── api_client.py         # RapidAPI client
-│       ├── db_utils.py           # Database operations
-│       └── mlflow_utils.py       # MLflow tracking
-├── notebooks/
-│   └── etl_data_showcase.ipynb   # Data exploration notebook
-├── docker-compose.yaml           # PostgreSQL container
-├── requirements.txt              # Python dependencies
-└── Dockerfile                    # Astro Airflow image
+
+### 3. Run the Pipeline
+```bash
+# Start PostgreSQL
+docker-compose up -d
+
+# Start Airflow
+astro dev start
+
+# Open Airflow UI: http://localhost:8080
+# Trigger: fuel_price_etl DAG
+
+# Run ML notebook
+jupyter notebook models/fuel_price_prediction.ipynb
 ```
 
 ---
 
-## 📊 Sample Data
+## 🛠️ Tech Stack
 
-### Bronze Layer (Raw JSONB)
-```sql
-SELECT city_id, applicable_on, raw_data->'fuel'->'petrol'->>'retailPrice' 
-FROM bronze_fuel_prices LIMIT 3;
-```
-| city_id | applicable_on | petrol_price |
-|---------|---------------|--------------|
-| mumbai | 2025-08-13 | 103.49 |
-| delhi | 2025-08-13 | 94.27 |
-| bengaluru | 2025-08-13 | 102.90 |
-
-### Silver Layer (Normalized)
-| city_id | fuel_type | retail_price | price_change |
-|---------|-----------|--------------|--------------|
-| mumbai | petrol | 103.49 | 0.00 |
-| mumbai | diesel | 89.88 | 0.00 |
-| mumbai | lpg | 772.50 | 0.00 |
-| mumbai | cng | 75.00 | 0.00 |
-
-### Gold Layer (Analytics)
-| state_name | fuel_type | avg_price | min_price | max_price |
-|------------|-----------|-----------|-----------|-----------|
-| Delhi | petrol | 94.27 | 94.27 | 94.27 |
-| Maharashtra | petrol | 103.49 | 103.49 | 103.49 |
-| Karnataka | petrol | 102.90 | 102.90 | 102.90 |
-
----
-
-## 🛠️ Technologies
-
-- **Apache Airflow** (Astronomer) - Workflow orchestration
-- **PostgreSQL 13** - Data warehouse with JSONB support
-- **Python 3.10** - ETL logic
-- **Docker** - Containerization
-- **MLflow** - Experiment tracking (local)
-
----
-
-## 📈 Future Enhancements
-
-- [ ] Add more cities (currently tracking 5 major metros)
-- [ ] ML model for price forecasting
-- [ ] Grafana dashboard for visualization
-- [ ] Deploy to Astronomer Cloud
+| Category | Tools |
+|----------|-------|
+| Orchestration | Apache Airflow (Astronomer) |
+| Database | PostgreSQL 13 |
+| ML | scikit-learn, LightGBM |
+| Visualization | Plotly |
+| Tracking | MLflow |
 
 ---
 
